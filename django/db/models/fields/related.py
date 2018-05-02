@@ -442,6 +442,9 @@ class RelatedField(FieldCacheMixin, Field):
     def get_cache_name(self):
         return self.name
 
+    def get_related_queryset(self, **hints):
+        return self.remote_field.model._base_manager.db_manager(hints=hints).all()
+
 
 class ForeignObject(RelatedField):
     """
@@ -897,8 +900,7 @@ class ForeignKey(ForeignObject):
         if value is None:
             return
 
-        using = router.db_for_read(self.remote_field.model, instance=model_instance)
-        qs = self.remote_field.model._default_manager.using(using).filter(
+        qs = self.get_related_queryset( instance = model_instance ).filter(
             **{self.remote_field.field_name: value}
         )
         qs = qs.complex_filter(self.get_limit_choices_to())
@@ -950,7 +952,7 @@ class ForeignKey(ForeignObject):
                              (self.name, self.remote_field.model))
         defaults = {
             'form_class': forms.ModelChoiceField,
-            'queryset': self.remote_field.model._default_manager.using(using),
+            'queryset': self.get_related_queryset(),
             'to_field_name': self.remote_field.field_name,
         }
         defaults.update(kwargs)
@@ -1621,7 +1623,7 @@ class ManyToManyField(RelatedField):
     def formfield(self, *, using=None, **kwargs):
         defaults = {
             'form_class': forms.ModelMultipleChoiceField,
-            'queryset': self.remote_field.model._default_manager.using(using),
+            'queryset': self.get_related_queryset(),
         }
         defaults.update(kwargs)
         # If initial is passed in, it's a list of related objects, but the
